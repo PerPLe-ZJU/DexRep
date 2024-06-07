@@ -1,0 +1,296 @@
+algo: ppo
+all_train: false
+eval_iter: null
+eval_seed: null
+graphics_device_id: cuda:0
+headless: false
+identifier: model_single3
+logger_dir: /media/szn/PSSD/szn/My/Project/TRO_Open_Version/runs/ReorientUp/model_single3/reorient_up_dexrep/seed200
+models:
+  clip_actions: 1.0
+  clip_observations: 5.0
+  encoder:
+    bn_type: part
+    emb_dim: 128
+    en_mode: patch
+    f_ex_mode: null
+    freeze: true
+    name: t20-retac-tmr05-bin-ft+dataset-BottleCap
+    pretrain_dir: model/vitac/model_and_config
+  learn:
+    agent_name: shadow_hand
+    asymmetric: false
+    cliprange: 0.2
+    desired_kl: 0.016
+    ent_coef: 0
+    gamma: 0.96
+    init_noise_std: 0.8
+    lam: 0.95
+    log_interval: 1
+    max_grad_norm: 1
+    max_iterations: 50000
+    n_per_env: 8
+    nminibatches: 4
+    noptepochs: 5
+    nsteps: 8
+    optim_stepsize: 0.0003
+    print_log: true
+    resume_model: ''
+    save_interval: 500
+    schedule: adaptive
+    test: false
+  policy:
+    activation: elu
+    actor_critic: ActorCriticDexRep
+    pi_hid_sizes:
+    - 512
+    - 512
+    - 128
+    vf_hid_sizes:
+    - 512
+    - 512
+    - 128
+  seed: 200
+  torch_deterministic: false
+  using_gpu: true
+num_gpus: 1
+physics_engine: physx
+pipeline: gpu
+resume_model: ''
+rl_device: cuda:0
+seed: 200
+sim_device: cuda:0
+task: reorient_up_dexrep
+task_envs:
+  dexrep:
+    batch_norm_pnfeat: false
+    sample_method: average
+    sample_num_points: 2048
+  env:
+    actionPenaltyScale: -0.0002
+    action_dim: 20
+    actionsMovingAverage: 1.0
+    aggregateMode: 1
+    asset:
+      assetFileNameObj: /reorient_up/
+      assetFileNameRobot: shadow_hand/mjcf/open_ai_assets/hand/shadow_hand_sensor.xml
+      assetRoot: ./asset
+    asymmetric_observations: false
+    clip_actions: 1.0
+    clip_observations: 5.0
+    controlFrequencyInv: 1
+    distRewardScale: -10
+    dofSpeedScale: 20.0
+    enableDebugVis: true
+    envSpacing: 0.75
+    env_dict:
+    - ycb_003_cracker_box
+    - ycb_005_tomato_soup_can
+    episodeLength: 600
+    fallDistance: 0.24
+    fallPenalty: 0.0
+    forceDecay: 0.99
+    forceDecayInterval: 0.08
+    forceLimitScale: 1.0
+    forceProbRange:
+    - 0.001
+    - 0.1
+    forceScale: 0.0
+    img_h: 224
+    img_w: 224
+    maxConsecutiveSuccesses: 0
+    numEnvs: 80
+    objectType: block
+    obs_dim:
+      dexrep_pnl: 1280
+      dexrep_sensor: 1080
+      prop: 211
+    obs_type: DexRep
+    observationType: full_state
+    orientation_scale: 0.5
+    printNumSuccesses: false
+    random_load:
+      a: 2
+      b: 2
+      num_obj_per_env: 1
+      obj_width: 0.1
+      sequential: true
+    random_prior: true
+    reachGoalBonus: 250
+    repose_z: true
+    resetDofPosRandomInterval: 0.2
+    resetDofVelRandomInterval: 0.0
+    resetPositionNoise: 0.01
+    resetRotationNoise: 0.0
+    rotEps: 0.1
+    rotRewardScale: 1.0
+    startPositionNoise: 0.01
+    startRotationNoise: 0.0
+    stiffnessScale: 1.0
+    successTolerance: 0.1
+    transition_scale: 0.05
+    useRelativeControl: false
+    vision:
+      camera:
+        eye:
+        - - -0.05
+          - 0.01
+          - 0.24
+        lookat:
+        - - 0.0
+          - -0.36
+          - 0.0
+  sim:
+    dt: 0.01667
+    physx:
+      always_use_articulations: false
+      bounce_threshold_velocity: 0.2
+      contact_offset: 0.002
+      default_buffer_size_multiplier: 5.0
+      max_depenetration_velocity: 1000.0
+      num_position_iterations: 8
+      num_threads: 4
+      num_velocity_iterations: 0
+      rest_offset: 0.0
+      solver_type: 1
+    substeps: 2
+  task:
+    randomization_params:
+      actions:
+        distribution: gaussian
+        operation: additive
+        range:
+        - 0.0
+        - 0.05
+        range_correlated:
+        - 0
+        - 0.015
+        schedule: linear
+        schedule_steps: 40000
+      actor_params:
+        hand:
+          color: true
+          dof_properties:
+            damping:
+              distribution: loguniform
+              operation: scaling
+              range:
+              - 0.3
+              - 3.0
+              schedule: linear
+              schedule_steps: 30000
+            lower:
+              distribution: gaussian
+              operation: additive
+              range:
+              - 0
+              - 0.01
+              schedule: linear
+              schedule_steps: 30000
+            stiffness:
+              distribution: loguniform
+              operation: scaling
+              range:
+              - 0.75
+              - 1.5
+              schedule: linear
+              schedule_steps: 30000
+            upper:
+              distribution: gaussian
+              operation: additive
+              range:
+              - 0
+              - 0.01
+              schedule: linear
+              schedule_steps: 30000
+          rigid_body_properties:
+            mass:
+              distribution: uniform
+              operation: scaling
+              range:
+              - 0.5
+              - 1.5
+              schedule: linear
+              schedule_steps: 30000
+          rigid_shape_properties:
+            friction:
+              distribution: uniform
+              num_buckets: 250
+              operation: scaling
+              range:
+              - 0.7
+              - 1.3
+              schedule: linear
+              schedule_steps: 30000
+          tendon_properties:
+            damping:
+              distribution: loguniform
+              operation: scaling
+              range:
+              - 0.3
+              - 3.0
+              schedule: linear
+              schedule_steps: 30000
+            stiffness:
+              distribution: loguniform
+              operation: scaling
+              range:
+              - 0.75
+              - 1.5
+              schedule: linear
+              schedule_steps: 30000
+        object:
+          rigid_body_properties:
+            mass:
+              distribution: uniform
+              operation: scaling
+              range:
+              - 0.5
+              - 1.5
+              schedule: linear
+              schedule_steps: 30000
+          rigid_shape_properties:
+            friction:
+              distribution: uniform
+              num_buckets: 250
+              operation: scaling
+              range:
+              - 0.7
+              - 1.3
+              schedule: linear
+              schedule_steps: 30000
+          scale:
+            distribution: uniform
+            operation: scaling
+            range:
+            - 0.95
+            - 1.05
+            schedule: linear
+            schedule_steps: 30000
+      frequency: 600
+      observations:
+        distribution: gaussian
+        operation: additive
+        range:
+        - 0
+        - 0.002
+        range_correlated:
+        - 0
+        - 0.001
+        schedule: linear
+        schedule_steps: 40000
+      sim_params:
+        gravity:
+          distribution: gaussian
+          operation: additive
+          range:
+          - 0
+          - 0.4
+          schedule: linear
+          schedule_steps: 40000
+    randomize: false
+  task_description: screw bottle cap for opening or closing
+  task_name: ReorientUp
+  video_path: runs/videos
+test: false
+which_gpu: -1
