@@ -12,7 +12,7 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.io import write_video
 from model.ppo import RolloutStorage
-from model.ppo.policy import ActorCritic, ActorCriticDexRep
+from model.ppo.policy import ActorCritic, ActorCriticDexRep, ActorCriticDoubleDexRep
 
 
 import copy
@@ -20,7 +20,8 @@ from utils.tensorboard_extract import tensorboard2csv
 
 _MODEL_FUNCS = {
     "ActorCritic": ActorCritic,
-    "ActorCriticDexRep": ActorCriticDexRep
+    "ActorCriticDexRep": ActorCriticDexRep,
+    "ActorCriticDoubleDexRep": ActorCriticDoubleDexRep
 }
 
 class PPO:

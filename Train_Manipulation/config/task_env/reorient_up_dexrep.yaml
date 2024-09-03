@@ -18,7 +18,6 @@ env:
   aggregateMode: 1
 
   asset:
-
     assetRoot: "./asset"
     assetFileNameRobot: "shadow_hand/mjcf/open_ai_assets/hand/shadow_hand_sensor.xml"
     assetFileNameObj: "/reorient_up/"

@@ -341,6 +341,219 @@ class ActorCriticDexRep(nn.Module):
 
         return actions_log_prob, entropy, value, actions_mean, self.log_std.repeat(actions_mean.shape[0], 1)
 
+class ActorCriticDoubleDexRep(nn.Module):
+    def __init__(self, obs_shape, actions_shape, initial_std, model_cfg, encoder_cfg, env_cfg):
+        super(ActorCriticDoubleDexRep, self).__init__()
+        self.obs_dim = [v for v in env_cfg['obs_dim'].values()]
+        # Encoder
+        emb_dim = encoder_cfg["emb_dim"]
+        self.dexrep_left_sensor_enc = nn.Linear(env_cfg['obs_dim']['dexrep_left_sensor'], emb_dim)
+        self.dexrep_right_sensor_enc = nn.Linear(env_cfg['obs_dim']['dexrep_right_sensor'], emb_dim)
+        self.bn_left_pnl = nn.BatchNorm1d(env_cfg['obs_dim']['dexrep_left_pnl'])
+        self.bn_right_pnl = nn.BatchNorm1d(env_cfg['obs_dim']['dexrep_right_pnl'])
+        self.dexrep_left_pointL_enc = nn.Linear(env_cfg['obs_dim']['dexrep_left_pnl'], emb_dim)
+        self.dexrep_right_pointL_enc = nn.Linear(env_cfg['obs_dim']['dexrep_right_pnl'], emb_dim)
+        self.state_enc = nn.Linear(env_cfg['obs_dim']['prop'], emb_dim)
+
+        # split num
+        self.split_idx1 = None
+        self.split_idx2 = None
+        self.split_idx3 = None
+
+        if model_cfg is None:
+            actor_hidden_dim = [256, 256, 256]
+            critic_hidden_dim = [256, 256, 256]
+            activation = get_activation("selu")
+        else:
+            actor_hidden_dim = model_cfg['pi_hid_sizes']
+            critic_hidden_dim = model_cfg['vf_hid_sizes']
+            activation = get_activation(model_cfg['activation'])
+
+        # Policy
+        actor_layers = []
+        actor_layers.append(nn.Linear(len(self.obs_dim) * emb_dim, actor_hidden_dim[0]))
+        actor_layers.append(activation)
+        for l in range(len(actor_hidden_dim)):
+            if l == len(actor_hidden_dim) - 1:
+                actor_layers.append(nn.Linear(actor_hidden_dim[l], *actions_shape))
+            else:
+                actor_layers.append(nn.Linear(actor_hidden_dim[l], actor_hidden_dim[l + 1]))
+                actor_layers.append(activation)
+        self.actor = nn.Sequential(*actor_layers)
+
+        # Value function
+        # self.extractors_vf = nn.ModuleList(LinearEncoder(self.obs_dim[i], hidden_size, obs_emb) for i in range(self.obs_dim.__len__()))
+        critic_layers = []
+
+        critic_layers.append(nn.Linear(len(self.obs_dim) * emb_dim, critic_hidden_dim[0]))
+        critic_layers.append(activation)
+        for l in range(len(critic_hidden_dim)):
+            if l == len(critic_hidden_dim) - 1:
+                critic_layers.append(nn.Linear(critic_hidden_dim[l], 1))
+            else:
+                critic_layers.append(nn.Linear(critic_hidden_dim[l], critic_hidden_dim[l + 1]))
+                critic_layers.append(activation)
+        self.critic = nn.Sequential(*critic_layers)
+
+        # Action noise
+        self.log_std = nn.Parameter(np.log(initial_std) * torch.ones(*actions_shape))
+
+        # Initialize the weights like in stable baselines
+        actor_weights = [np.sqrt(2)] * len(actor_hidden_dim)
+        actor_weights.append(0.01)
+        critic_weights = [np.sqrt(2)] * len(critic_hidden_dim)
+        critic_weights.append(1.0)
+        self.init_weights(self.actor, actor_weights)
+        self.init_weights(self.critic, critic_weights)
+
+        torch.nn.init.orthogonal_(self.state_enc.weight, gain=np.sqrt(2))
+        torch.nn.init.orthogonal_(self.dexrep_left_sensor_enc.weight, gain=np.sqrt(2))
+        torch.nn.init.orthogonal_(self.dexrep_right_sensor_enc.weight, gain=np.sqrt(2))
+        torch.nn.init.orthogonal_(self.dexrep_left_pointL_enc.weight, gain=np.sqrt(2))
+        torch.nn.init.orthogonal_(self.dexrep_right_pointL_enc.weight, gain=np.sqrt(2))
+
+    @staticmethod
+    def init_weights(sequential, scales):
+        [torch.nn.init.orthogonal_(module.weight, gain=scales[idx]) for idx, module in
+         enumerate(mod for mod in sequential if isinstance(mod, nn.Linear))]
+
+    def obs_division(self, x):
+        n_input_types = len(self.obs_dim)
+        assert n_input_types > 1
+        x_list = []
+        st_idx = 0
+        for idx in range(n_input_types):
+            end_idx = st_idx + self.obs_dim[idx]
+            x_list.append(x[:, st_idx:end_idx])
+            st_idx += self.obs_dim[idx]
+
+        return x_list
+
+    def forward(self):
+        raise NotImplementedError
+
+    @torch.no_grad()
+    def act(self, observations):
+        self.bn_left_pnl.eval()
+        self.bn_right_pnl.eval()
+        # observation split
+        state, dexrep_left_sensor, dexrep_left_pnl, dexrep_right_sensor, dexrep_right_pnl = self.obs_division(observations)
+        # state
+        state_emb = self.state_enc(state)
+        # dexrep sensor
+        dexrep_left_sensor_emb = self.dexrep_left_sensor_enc(dexrep_left_sensor)
+        dexrep_right_sensor_emb = self.dexrep_right_sensor_enc(dexrep_right_sensor)
+        # dexrep pnl batch norm
+        dexrep_left_pnl = self.bn_left_pnl(dexrep_left_pnl)
+        dexrep_right_pnl = self.bn_right_pnl(dexrep_right_pnl)
+        # dexrep pnl Linear
+        dexrep_left_pnl_emb = self.dexrep_left_pointL_enc(dexrep_left_pnl)
+        dexrep_right_pnl_emb = self.dexrep_right_pointL_enc(dexrep_right_pnl)
+        # dexrep norm
+        dexrep_left_sensor_emb = F.normalize(dexrep_left_sensor_emb, dim=-1)
+        dexrep_left_pnl_emb = F.normalize(dexrep_left_pnl_emb)
+        dexrep_right_sensor_emb = F.normalize(dexrep_right_sensor_emb)
+        dexrep_right_pnl_emb = F.normalize(dexrep_right_pnl_emb)
+
+        joint_emb = torch.cat([state_emb, dexrep_left_sensor_emb, dexrep_left_pnl_emb, dexrep_right_sensor_emb, dexrep_right_pnl_emb], dim=1)
+
+        actions_mean = self.actor(joint_emb)
+
+        covariance = torch.diag(self.log_std.exp() * self.log_std.exp())
+        distribution = MultivariateNormal(actions_mean, scale_tril=covariance)
+
+        actions = distribution.sample()
+        actions_log_prob = distribution.log_prob(actions)
+
+        # obs_emb_vf = self.extract_feat(observations, self.extractors_vf)
+        value = self.critic(joint_emb)
+
+        return actions.detach(), \
+               actions_log_prob.detach(), \
+               value.detach(), \
+               actions_mean.detach(), \
+               self.log_std.repeat(actions_mean.shape[0], 1).detach(), \
+               state.detach(),\
+               observations[:, state.shape[1]:].detach()
+
+    @torch.no_grad()
+    def act_inference(self, observations):
+        # self.obs_enc.eval()
+        self.bn_left_pnl.eval()
+        self.bn_right_pnl.eval()
+        # observation split
+        state, dexrep_left_sensor, dexrep_left_pnl, dexrep_right_sensor, dexrep_right_pnl = self.obs_division(observations)
+        # state
+        state_emb = self.state_enc(state)
+        # dexrep sensor
+        dexrep_left_sensor_emb = self.dexrep_left_sensor_enc(dexrep_left_sensor)
+        dexrep_right_sensor_emb = self.dexrep_right_sensor_enc(dexrep_right_sensor)
+        # dexrep pnl batch norm
+        dexrep_left_pnl = self.bn_left_pnl(dexrep_left_pnl)
+        dexrep_right_pnl = self.bn_right_pnl(dexrep_right_pnl)
+        # dexrep pnl Linear
+        dexrep_left_pnl_emb = self.dexrep_left_pointL_enc(dexrep_left_pnl)
+        dexrep_right_pnl_emb = self.dexrep_right_pointL_enc(dexrep_right_pnl)
+        # dexrep norm
+        dexrep_left_sensor_emb = F.normalize(dexrep_left_sensor_emb, dim=-1)
+        dexrep_left_pnl_emb = F.normalize(dexrep_left_pnl_emb)
+        dexrep_right_sensor_emb = F.normalize(dexrep_right_sensor_emb)
+        dexrep_right_pnl_emb = F.normalize(dexrep_right_pnl_emb)
+
+        joint_emb = torch.cat(
+            [state_emb, dexrep_left_sensor_emb, dexrep_left_pnl_emb, dexrep_right_sensor_emb, dexrep_right_pnl_emb],
+            dim=1)
+
+        actions_mean = self.actor(joint_emb)
+        return actions_mean
+
+    def evaluate(self, obs_features, state, actions):
+        # self.obs_enc.eval()
+        self.bn_left_pnl.train()
+        self.bn_right_pnl.train()
+
+        state_emb = self.state_enc(state)
+        # observation split
+        if self.split_idx1 == None:
+            self.split_idx1 = self.obs_dim[1]
+            self.split_idx2 = self.obs_dim[1] + self.obs_dim[2]
+            self.split_idx3 = self.split_idx2 + self.obs_dim[3]
+        dexrep_left_sensor = obs_features[:, :self.split_idx1]
+        dexrep_left_pnl = obs_features[:, self.split_idx1:self.split_idx2]
+        dexrep_right_sensor = obs_features[:, self.split_idx2:self.split_idx3]
+        dexrep_right_pnl = obs_features[:, self.split_idx3:]
+        # dexrep sensor
+        dexrep_left_sensor_emb = self.dexrep_left_sensor_enc(dexrep_left_sensor)
+        dexrep_right_sensor_emb = self.dexrep_right_sensor_enc(dexrep_right_sensor)
+        # dexrep pnl batch norm
+        dexrep_left_pnl = self.bn_left_pnl(dexrep_left_pnl)
+        dexrep_right_pnl = self.bn_right_pnl(dexrep_right_pnl)
+        # dexrep pnl Linear
+        dexrep_left_pnl_emb = self.dexrep_left_pointL_enc(dexrep_left_pnl)
+        dexrep_right_pnl_emb = self.dexrep_right_pointL_enc(dexrep_right_pnl)
+        # dexrep norm
+        dexrep_left_sensor_emb = F.normalize(dexrep_left_sensor_emb, dim=-1)
+        dexrep_left_pnl_emb = F.normalize(dexrep_left_pnl_emb)
+        dexrep_right_sensor_emb = F.normalize(dexrep_right_sensor_emb)
+        dexrep_right_pnl_emb = F.normalize(dexrep_right_pnl_emb)
+
+        joint_emb = torch.cat(
+            [state_emb, dexrep_left_sensor_emb, dexrep_left_pnl_emb, dexrep_right_sensor_emb, dexrep_right_pnl_emb],
+            dim=1)
+        actions_mean = self.actor(joint_emb)
+
+        covariance = torch.diag(self.log_std.exp() * self.log_std.exp())
+        distribution = MultivariateNormal(actions_mean, scale_tril=covariance)
+
+        actions_log_prob = distribution.log_prob(actions)
+        entropy = distribution.entropy()
+
+        # obs_emb_vf = self.extract_feat(observations, self.extractors_vf)
+        value = self.critic(joint_emb)
+
+        return actions_log_prob, entropy, value, actions_mean, self.log_std.repeat(actions_mean.shape[0], 1)
+
+
 def get_activation(act_name):
     if act_name == "elu":
         return nn.ELU()

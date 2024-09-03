@@ -21,7 +21,8 @@ from tv_tasks.tasks import *
 
 # Available tasks
 _TASK_MAP = {
-    "ReorientUp": ReorientUp
+    "ReorientUp": ReorientUp,
+    "HandOver": HandOver
 }
 
 
