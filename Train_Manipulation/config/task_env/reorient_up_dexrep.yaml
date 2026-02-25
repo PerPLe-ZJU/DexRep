@@ -7,9 +7,11 @@ dexrep:
   sample_method: 'average'
   sample_num_points: 2048
   batch_norm_pnfeat: False
+  ambient_voxel_length: 0.01
+  dis_max_range: 0.1
 
 env:
-  numEnvs: 80
+  numEnvs: 8000
   envSpacing: 0.75
   episodeLength: 600
   random_prior: True
@@ -23,33 +25,49 @@ env:
     assetFileNameObj: "/reorient_up/"
 
   env_dict:
-    - ycb_003_cracker_box
-    - ycb_005_tomato_soup_can
-#      - ddg-ycb_012_strawberry
-#      - ddg-ycb_013_apple
-#      - ddg-ycb_014_lemon
-#      - ddg-ycb_015_peach
-#      - ddg-ycb_017_orange
-#      - ddg-ycb_019_pitcher_base
-#      - ddg-ycb_021_bleach_cleanser
-#      - ddg-ycb_036_wood_block
-#      - ddg-ycb_038_padlock
-#      - ddg-ycb_040_large_marker
-#      - ddg-ycb_054_softball
-#      - ddg-ycb_055_baseball
-#      - ddg-ycb_056_tennis_ball
-#      - ddg-ycb_057_racquetball
-#      - ddg-ycb_058_golf_ball
-#      - ddg-ycb_065-a_cups
-#      - ddg-ycb_065-b_cups
-#      - ddg-ycb_065-c_cups
-#      - ddg-ycb_065-e_cups
-#      - ddg-ycb_065-f_cups
-#      - ddg-ycb_070-a_colored_wood_blocks
-#      - ddg-ycb_070-b_colored_wood_blocks
-#      - ddg-ycb_072-a_toy_airplane
-#      - ddg-ycb_072-b_toy_airplane
-#      - ddg-ycb_077_rubiks_cube
+    # seen
+    - ddg-ycb_012_strawberry
+    - ddg-ycb_013_apple
+    - ddg-ycb_014_lemon
+    - ddg-ycb_015_peach
+    - ddg-ycb_017_orange
+    - ddg-ycb_019_pitcher_base
+    - ddg-ycb_021_bleach_cleanser
+    - ddg-ycb_036_wood_block
+    - ddg-ycb_038_padlock
+    - ddg-ycb_040_large_marker
+    - ddg-ycb_054_softball
+    - ddg-ycb_055_baseball
+    - ddg-ycb_056_tennis_ball
+    - ddg-ycb_057_racquetball
+    - ddg-ycb_058_golf_ball
+    - ddg-ycb_065-a_cups
+    - ddg-ycb_065-b_cups
+    - ddg-ycb_065-c_cups
+    - ddg-ycb_065-e_cups
+    - ddg-ycb_065-f_cups
+    - ddg-ycb_070-a_colored_wood_blocks
+    - ddg-ycb_070-b_colored_wood_blocks
+    - ddg-ycb_072-a_toy_airplane
+    - ddg-ycb_072-b_toy_airplane
+    - ddg-ycb_077_rubiks_cube
+    # unseen
+#    - ddg-ycb_003_cracker_box
+#    - ddg-ycb_005_tomato_soup_can
+#    - ddg-ycb_016_pear
+#    - ddg-ycb_018_plum
+#    - ddg-ycb_051_large_clamp
+#    - ddg-ycb_065-d_cups
+#    - ddg-ycb_065-g_cups
+#    - ddg-ycb_065-h_cups
+#    - ddg-ycb_072-c_toy_airplane
+#    - ddg-ycb_072-d_toy_airplane
+#    - ddg-ycb_072-e_toy_airplane
+
+
+
+
+#      - cube_multicolor
   # env param
   obs_type:
     "DexRep"
@@ -246,4 +264,3 @@ sim:
     always_use_articulations: False
 
 video_path : 'runs/videos'
-

@@ -7,6 +7,8 @@ dexrep:
   sample_method: 'average'
   sample_num_points: 2048
   batch_norm_pnfeat: False
+  ambient_voxel_length: 0.02
+  dis_max_range: 0.2
 
 env:
   numEnvs: 4000
@@ -28,16 +30,26 @@ env:
     assetFileNameObj: "/handover/"
 
   env_dict:
-    - ycb_004_sugar_box
-    - ycb_011_banana
-    - ycb_012_strawberry
-    - ycb_013_apple
-    - ycb_015_peach
-    - ycb-018_plum
-    - ycb-025_mug
-    - ycb-026_sponge
-    - ycb_040_large_marker
 
+    # seen
+#    - ycb-004_sugar_box
+#    - ycb-011_banana
+#    - ycb-012_strawberry
+#    - ycb-013_apple
+#    - ycb-015_peach
+#    - ycb-018_plum
+#    - ycb-025_mug
+#    - ycb-026_sponge
+#    - ycb-040_large_marker
+    # unseen
+    - ddg-ycb_003_cracker_box
+    - ddg-ycb_016_pear
+    - ddg-ycb_017_orange
+    - ddg-ycb_014_lemon
+    - ddg-ycb_024_bowl
+    - ddg-ycb_037_scissors
+    - ddg-ycb_038_padlock
+    - ddg-ycb_052_extra_large_clamp
 
 
   # env param
@@ -228,4 +240,3 @@ sim:
     always_use_articulations: False
 
 video_path : 'runs/videos'
-

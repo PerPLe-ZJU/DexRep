@@ -2,12 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dexrep.pointnet_model.pointnet_utils import PointNetEncoder
-# from contact2mesh.models.pointnet2.pointnet2_utils_new import PointNet2Encoder, PointNet2Encoder_mscale, \
-#     square_distance, index_points,PointNetSetAbstraction
-# from contact2mesh.models.transformer.point_transformer import SA_Layer
-# from contact2mesh.models.transformer.transformer import Transformer
-# from pytorch_transformers.modeling_bert import BertConfig
-# from pointnet2_ops import pointnet2_utils
 
 class ResBlock(nn.Module):
 

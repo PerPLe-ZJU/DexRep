@@ -1,13 +1,10 @@
-import os.path
-import pickle
 import warnings
 
 import gym
 import torch
-import trimesh
 from gym.envs.registration import register
 import numpy as np
-# from mjrl.utils.gym_env import GymEnv
+
 
 def RegisterEnv(obj_name=None, env_py='grasp0_v0', env_maker=True, render=False, mode='template'):
 
@@ -165,3 +162,56 @@ class DotDict(dict):
         if isinstance(value, dict):
             value = DotDict(value)
         return value
+
+def split_batch_process(split_batch, input_tensor_list, process_chain):
+    batch_num = input_tensor_list[0].shape[0]
+    batch_split_num = int((batch_num + split_batch - 1) / split_batch)
+    # split input
+    split_input_list = []
+    for it in input_tensor_list:
+        assert batch_num == it.shape[0]
+        it_slices = [
+            it[i*split_batch:(i+1)*split_batch, ...] \
+            for i in range(batch_split_num)
+        ]
+        split_input_list.append(it_slices)
+    # transpose input list
+    split_input_list = [list(item) for item in zip(*split_input_list)]
+    # process
+    result_list = []
+    for iter in range(batch_split_num):
+        chain_idx = 0
+        result = None
+        for my_func in process_chain:
+            if chain_idx == 0: # input
+                result = my_func(*split_input_list[iter])
+            else:
+                result = my_func(result)
+            chain_idx += 1
+        result_list.append(result)
+
+def split_torch_dist(finger_points, obj_pcb, split_batch):
+    assert finger_points.shape[0] == obj_pcb.shape[0]
+    batch_num = finger_points.shape[0]
+    batch_split_num = int((batch_num + split_batch - 1) / split_batch)
+    # split input
+    finger_points_split = [
+        finger_points[i*split_batch:(i+1)*split_batch, ...] \
+            for i in range(batch_split_num)
+    ]
+    obj_pcb_split = [
+        obj_pcb[i * split_batch:(i + 1) * split_batch, ...] \
+            for i in range(batch_split_num)
+    ]
+    # process
+    dis_min_slices, dis_min_idx_slices = [], []
+    for iter in range(batch_split_num):
+        dis_split = torch.cdist(finger_points_split[iter], obj_pcb_split[iter])
+        dis_min_split, dis_min_idx_split = torch.min(dis_split, dim=-1)
+        dis_min_slices.append(dis_min_split)
+        dis_min_idx_slices.append(dis_min_idx_split)
+    # cat
+    dis_min = torch.cat(dis_min_slices, dim=0)
+    dis_min_idx = torch.cat(dis_min_idx_slices, dim=0)
+
+    return dis_min, dis_min_idx

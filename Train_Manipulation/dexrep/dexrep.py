@@ -1,35 +1,36 @@
 import os.path
-import time
-# kakureteru kokoro no doa wo kojiaketа
 import open3d as o3d
 import numpy as np
 import copy
-
 import torch
 from dexrep.utils import penetration, pc_normalize_tensor, pc_normalize2_tensor, denormalize, DotDict
 from dexrep.pointnet_model.model_rec import ShapeNetAutoEncoder
-# from pcd_rec_pretrain.model_rec import ShapeNetPnetEncoder, ShapeNetPnet2Encoder, ShapeNetPCTEncoder
-# from pcd_rec_pretrain.pointnet2.pointnet2_part_seg_ssg import get_model as pointnet2_part_seg_ssg
-# from pcd_rec_pretrain.model_rec1 import ShapeNetPCTEncoder2
-# from scipy.spatial.transform import Rotation as R
 from pytorch3d.transforms import quaternion_to_matrix
-import utils.util as util
+import dexrep.utils as util
 
-# from utils.szn_utils import sdf_signs_query_points
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # device = torch.device('cpu')
 torch.backends.cudnn.enable =True
 torch.backends.cudnn.benchmark = True
 # device = torch.device('cpu')
 
 class cv_space(object):
-    def __init__(self, sensor_type="all_pointnetL_pre"):
+    def __init__(self, args, sensor_type="all_pointnetL_pre", device="cuda:0"):
         # ts=time.time()
-        self.length = 0.1
+        # self.length = 0.1
+        # # length_per_cube = 0.01
+        # self.length_per_cube = 0.01
+        self.device = device
+        self.args = args
+
         # length_per_cube = 0.01
-        self.length_per_cube = 0.01
+        self.length_per_cube = self.args["dexrep"]["ambient_voxel_length"]
+        self.length = self.length_per_cube * 10
         self.all_cubes_center = self.create_grid(self.length, self.length_per_cube)
+        self.dis_max_range = self.args["dexrep"]["dis_max_range"]
+        print("ambient_voxel_length: ", self.length_per_cube)
+        print("dis_max_range: ", self.dis_max_range)
         # print('grid:', time.time()-ts)
         # self.VG.show()
 
@@ -45,39 +46,7 @@ class cv_space(object):
         self.batch_split_num = 50
 
         self.all_cubes_center = None
-        # self.hand_body_idx = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 24, 25, 26])#[3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 26, 27, 28]
-        # self.hand_body_idx_except_knuckle = np.array([1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 16, 18, 19, 20, 22, 24, 25, 26])#[3, 4, 5, 7, 8, 9, 11, 12, 13, 15, 16, 17, 18, 20, 21, 22, 24, 26, 27, 28]
-        # self.hand_body_idx = torch.LongTensor([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 26, 27,28]).to(device)  # [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 26, 27, 28]
-        # self.hand_body_idx_except_knuckle = torch.LongTensor([3, 4, 5, 7, 8, 9, 11, 12, 13, 15, 16, 17, 18, 20, 21, 22, 24, 26, 27,28]).to(device)  # [3, 4, 5, 7, 8, 9, 11, 12, 13, 15, 16, 17, 18, 20, 21, 22, 24, 26, 27, 28]
-        # self.hand_body_name = []
-        # for idx in self.hand_body_idx:
-        #     self.hand_body_name.append(piece_hand_names[idx])
-        # self.hand_body_name_except_knuckle = []
-        # for idx in self.hand_body_idx_except_knuckle:
-        #     self.hand_body_name_except_knuckle.append(piece_hand_names[idx])
-        # # import obj info
-        # if mode == 'grab':
-        #     all_obj_info = np.load(os.path.join(os.path.dirname(self.curr_dir), 'obj_info/obj_info.npy'),
-        #                            allow_pickle=True).item()
-        #     self.obj_info = all_obj_info[obj_name.lower()]
-        # elif mode == 'shapenet':
-        #     path = '/home/zjunesc/LQT/grasp/grasp_sensor1209/shapenet_obj_info/obj_info'
-        #     all_obj_info = np.load(os.path.join(path, '%s.pkl' % categ), allow_pickle=True)['categ_objs_info']
-        #     self.obj_info = all_obj_info[obj_name + '.obj']
-        #
-        # elif mode=='3dnet':
-        #     path = '../../../obj_info/3dnet/obj_info'
-        #     path = os.path.join(self.curr_dir, path)
-        #     all_obj_info = np.load(os.path.join(path, '3dnet_obj_info.pkl'), allow_pickle=True)
-        #     self.obj_info = all_obj_info[obj_name.lower()]
-        # elif mode=='dexgraspnet':
-        #     path = '../../../obj_info/DexGraspNet/obj_info'
-        #     path = os.path.join(self.curr_dir, path)
-        #     all_obj_info = np.load(os.path.join(path, 'dexgraspnet_obj_info.pkl'), allow_pickle=True)
-        #     self.obj_info = all_obj_info[obj_name[0].lower()+obj_name[1:]]
-        # self.import_mesh(mesh_dir)
-        #
-        # self.cnt = 0
+
 
     def create_grid(self, length, length_per_cube, dtype=torch.float32):
         start = -(length - length_per_cube) / 2
@@ -97,7 +66,7 @@ class cv_space(object):
         checkpoint = torch.load(checkpoint_path, map_location='cpu')
         self.PN = ShapeNetAutoEncoder()
         self.PN.load_state_dict(checkpoint)
-        self.PN = self.PN.to(device)
+        self.PN = self.PN.to(self.device)
         self.PN.requires_grad_(False)
         self.PN.eval()
 
@@ -111,32 +80,32 @@ class cv_space(object):
             mesh_obj.triangles = o3d.utility.Vector3iVector(self.obj_info['faces'])
             mesh_obj.compute_vertex_normals(normalized=True)
             mesh_obj.compute_triangle_normals(normalized=True)
-            self.obj_info['verts_sample'] = torch.from_numpy(np.asarray(mesh_obj.vertices)[self.obj_info['verts_sample_id']]).float().to(device)
-            self.obj_info['verts_normal'] = torch.from_numpy(np.asarray(mesh_obj.vertex_normals)[self.obj_info['verts_sample_id']]).float().to(device)
-            self.obj_info['verts_sample_id'] = torch.LongTensor(self.obj_info['verts_sample_id']).to(device)
+            self.obj_info['verts_sample'] = torch.from_numpy(np.asarray(mesh_obj.vertices)[self.obj_info['verts_sample_id']]).float().to(self.device)
+            self.obj_info['verts_normal'] = torch.from_numpy(np.asarray(mesh_obj.vertex_normals)[self.obj_info['verts_sample_id']]).float().to(self.device)
+            self.obj_info['verts_sample_id'] = torch.LongTensor(self.obj_info['verts_sample_id']).to(self.device)
         else:
-            self.obj_info['verts_sample'] = torch.from_numpy(self.obj_info['verts_sample']).float().to(device)
-            self.obj_info['verts_normal'] = torch.from_numpy(self.obj_info['verts_normal']).float().to(device)
+            self.obj_info['verts_sample'] = torch.from_numpy(self.obj_info['verts_sample']).float().to(self.device)
+            self.obj_info['verts_normal'] = torch.from_numpy(self.obj_info['verts_normal']).float().to(self.device)
 
         self.obj_info_ori = copy.deepcopy(self.obj_info)
 
 
     def get_perception_data(self, pos, quat, joint_sites, obj_verts, obj_norms):
-        # pos = torch.from_numpy(pos).float().to(device)
-        # quat = torch.from_numpy(quat).float().to(device)
+        # pos = torch.from_numpy(pos).float().to(self.device)
+        # quat = torch.from_numpy(quat).float().to(self.device)
         # rot = quaternion_to_matrix(quat)
         #
-        # joint_sites = torch.from_numpy(joint_sites).float().to(device)
+        # joint_sites = torch.from_numpy(joint_sites).float().to(self.device)
         #
-        # obj_verts = torch.from_numpy(obj_verts).float().to(device)
-        # obj_norms = torch.from_numpy(obj_norms).float().to(device)
-        pos = torch.tensor(pos, dtype=torch.float32).to(device)
-        quat = torch.tensor(quat, dtype=torch.float32).to(device)
+        # obj_verts = torch.from_numpy(obj_verts).float().to(self.device)
+        # obj_norms = torch.from_numpy(obj_norms).float().to(self.device)
+        pos = torch.tensor(pos, dtype=torch.float32).to(self.device)
+        quat = torch.tensor(quat, dtype=torch.float32).to(self.device)
         rot = quaternion_to_matrix(quat)  # (N, 30, 3, 3)
 
-        joint_sites = torch.tensor(joint_sites, dtype=torch.float32).to(device)
-        obj_verts = torch.tensor(obj_verts, dtype=torch.float32).to(device)
-        obj_norms = torch.tensor(obj_norms, dtype=torch.float32).to(device)
+        joint_sites = torch.tensor(joint_sites, dtype=torch.float32).to(self.device)
+        obj_verts = torch.tensor(obj_verts, dtype=torch.float32).to(self.device)
+        obj_norms = torch.tensor(obj_norms, dtype=torch.float32).to(self.device)
 
         obj_rot_mat = rot[-2]
         obj_trans = pos[-2]
@@ -168,14 +137,14 @@ class cv_space(object):
                                   goal_pos=None, goal_quat=None):
                                   # mesh_names=None, sdfs=None):
         """ N x pos/quat/..."""
-        # pos = torch.tensor(pos, dtype=torch.float32).to(device)    # (N, 30, 3)
-        # quat = torch.tensor(quat, dtype=torch.float32).to(device)  # (N, 30, 4)
+        # pos = torch.tensor(pos, dtype=torch.float32).to(self.device)    # (N, 30, 3)
+        # quat = torch.tensor(quat, dtype=torch.float32).to(self.device)  # (N, 30, 4)
         rot = quaternion_to_matrix(torch.roll(quat, 1, dims=1))                  # (N, 30, 3, 3)
         hand_rot = quaternion_to_matrix(torch.roll(hand_quat, 1, dims=1))
 
-        # joint_sites = torch.tensor(joint_sites, dtype=torch.float32).to(device)    # (N, 20, 3)
-        # obj_verts = torch.tensor(obj_verts, dtype=torch.float32).to(device)   # (N, 2048, 3)
-        # obj_norms = torch.tensor(obj_norms, dtype=torch.float32).to(device)   # (N, 2048, 3)
+        # joint_sites = torch.tensor(joint_sites, dtype=torch.float32).to(self.device)    # (N, 20, 3)
+        # obj_verts = torch.tensor(obj_verts, dtype=torch.float32).to(self.device)   # (N, 2048, 3)
+        # obj_norms = torch.tensor(obj_norms, dtype=torch.float32).to(self.device)   # (N, 2048, 3)
 
         # Env_Num = pos.shape[0]
         # obj_rot_mat = rot[:, -2, :, :].squeeze(dim=1)    # (N, 1, 3, 3) -> (N, 3, 3)
@@ -341,7 +310,7 @@ class cv_space(object):
 
     def select_pointnet_local_feat(self, l_feat, loc_idx):
         if type(loc_idx) is not torch.Tensor:
-            loc_idx = torch.LongTensor(loc_idx).to(device)
+            loc_idx = torch.LongTensor(loc_idx).to(self.device)
         if loc_idx.ndim == 1:
             loc_idx = loc_idx.unsqueeze(dim=0)
         loc_idx_ = loc_idx.unsqueeze(dim=-1).repeat(1, 1, l_feat.shape[1])
@@ -351,7 +320,7 @@ class cv_space(object):
     def instance(self, pcd):
         # pcd = pc_normalize_tensor(pcd)
         if isinstance(pcd, np.ndarray):
-            pcd_tensor = torch.from_numpy(pcd.reshape(-1, 2048, 3)).float().to(device)
+            pcd_tensor = torch.from_numpy(pcd.reshape(-1, 2048, 3)).float().to(self.device)
         else:
             pcd_tensor = torch.clone(pcd).reshape(-1, 2048, 3)
 
@@ -391,7 +360,7 @@ class cv_space(object):
             dis_min, dis_min_idx = util.split_torch_dist(finger_points, obj_pcb, split_batch=batch_split)
 
             self.joints2objsurface = dis_min[:, 1:].cpu().numpy().copy()   # (N, 19)
-            dis_min = dis_min.clip(max=0.1)  # (N, 20)
+            dis_min = dis_min.clip(max=self.dis_max_range)  # (N, 20)
 
             # origin points
             origin_min_points = origin_pcb[torch.arange(origin_pcb.size(0)).unsqueeze(1), dis_min_idx, :]  # (N, 20, 3)
@@ -415,14 +384,14 @@ class cv_space(object):
             if sensor_type in ["dexrep_toGoal", "surf2g"]:
                 squared_diff = (goal_mindis_points - obj_mindis_points) ** 2
                 obj2goal = torch.sqrt(torch.sum(squared_diff, dim=2))
-                obj2goal = obj2goal.clip(max=0.1)  # (N, 20)
+                obj2goal = obj2goal.clip(max=self.dis_max_range)  # (N, 20)
                 goal_mindis_norms = torch.matmul(torch.clone(origin_min_norms), goal_rot_mat.transpose(-1, -2))  # (N, 20, 3)
                 SD2g = torch.cat([goal_mindis_norms.reshape(batch_size_N, -1), obj2goal * 10],
                                  dim=-1)  # (N, 20, 3) + (N, 20) -> (N, 80)
             elif sensor_type in ["dexrep_VtoGoal", "dexrep_VVtoGoal", "surfv2g", "surfvv2g"]:
                 obj2goal_vector = goal_mindis_points - obj_mindis_points  # (N, 20, 3)
                 goal_mindis_norms = torch.matmul(origin_min_norms, goal_rot_mat.transpose(-1, -2))  # (N, 20, 3)
-                obj2goal_vector = obj2goal_vector.clip(max=0.1)
+                obj2goal_vector = obj2goal_vector.clip(max=self.dis_max_range)
                 SD2g = torch.cat(
                     [goal_mindis_norms.reshape(batch_size_N, -1), obj2goal_vector.reshape(batch_size_N, -1) * 10],
                     dim=-1
@@ -449,7 +418,7 @@ class cv_space(object):
             # dis2g = torch.cdist(finger_points, goal_pcb)  # (N, 20, 2048)
             # dis2g_min, dis2g_min_idx = torch.min(dis2g, dim=-1)
             dis2g_min, dis2g_min_idx = util.split_torch_dist(finger_points, goal_pcb, split_batch=batch_split)
-            dis2g_min = dis2g_min.clip(max=0.1)  # (N, 20)
+            dis2g_min = dis2g_min.clip(max=self.dis_max_range)  # (N, 20)
             # goal points normal
             goal_mindis_norms = torch.clone(
                 goal_pcb_normal[torch.arange(goal_pcb_normal.size(0)).unsqueeze(1), dis2g_min_idx, :])
@@ -467,7 +436,7 @@ class cv_space(object):
             dis_min, dis_min_idx = util.split_torch_dist(finger_points, obj_pcb, split_batch=batch_split)
 
             self.joints2objsurface = dis_min[:, 1:].cpu().numpy().copy()  # (N, 19)
-            dis_min = dis_min.clip(max=0.1)  # (N, 20)
+            dis_min = dis_min.clip(max=self.dis_max_range)  # (N, 20)
             # origin points
             origin_min_norms = origin_pcb_normal[torch.arange(origin_pcb_normal.size(0)).unsqueeze(1), dis_min_idx, :]  # (N, 20, 3)
             # obj surf normals
@@ -507,7 +476,7 @@ class cv_space(object):
         else:
             self.joints2objsurface = dis_min[1:].cpu().numpy().copy()
 
-        dis_min = dis_min.clip(max=0.1)          # (N, 20)
+        dis_min = dis_min.clip(max=self.dis_max_range)          # (N, 20)
 
         # con_verts_min_normal_deonm = np.linalg.norm(con_verts_min_normal, axis=-1, keepdims=True)
         # con_verts_min_normal = con_verts_min_normal / con_verts_min_normal_deonm
@@ -535,17 +504,17 @@ class cv_space(object):
         if ifBatch:
             env_name = rotation.shape[0]
             all_cube_center = self.create_grid(self.length, self.length_per_cube,
-                                               dtype=torch.float32).repeat(env_name, 1, 1).to(device)
-            off_set = torch.tensor(np.array([0, 0.045, 0]), dtype=torch.float32).to(device)  # (3)
+                                               dtype=torch.float32).repeat(env_name, 1, 1).to(self.device)
+            off_set = torch.tensor(np.array([0, -self.length*0.9/2, 0]), dtype=torch.float32).to(self.device)  # (3)
         else:
             all_cube_center = self.create_grid(self.length, self.length_per_cube,
-                                               dtype=torch.float32).to(device)  # (1000, 3)
-            off_set = torch.tensor(np.array([0, 0.045, 0]), dtype=torch.float32).to(device)  # (3)
+                                               dtype=torch.float32).to(self.device)  # (1000, 3)
+            off_set = torch.tensor(np.array([0, -self.length*0.9/2, 0]), dtype=torch.float32).to(self.device)  # (3)
         all_cube_center += off_set                            # (1000, 3)
 
         all_cube_center = torch.matmul(all_cube_center, rotation.transpose(-1, -2)) + trans.unsqueeze(-2)  # (1000, 3) * (N, 3, 3) + (N, 1, 3) -> (N, 1000, 3)
 
-        occupied_area = torch.zeros(all_cube_center.shape[:-1]).float().to(device)  # (N, 1000)
+        occupied_area = torch.zeros(all_cube_center.shape[:-1]).float().to(self.device)  # (N, 1000)
         # ts = time.time()
         # dis = scene.compute_signed_distance(all_cube_center.astype(np.float32)).numpy()
         # obj_pcb = o3d.geometry.PointCloud()
@@ -592,8 +561,8 @@ class cv_space(object):
         if self.all_cubes_center is None:
             self.cube_center_batch_num = batch_num
             all_cube_center = self.create_grid(self.length, self.length_per_cube,
-                                               dtype=torch.float32).repeat(batch_num, 1, 1).to(device)
-            off_set = torch.tensor(np.array([0, 0.045, 0]), dtype=torch.float32).to(device)
+                                               dtype=torch.float32).repeat(batch_num, 1, 1).to(self.device)
+            off_set = torch.tensor(np.array([0, 0.045, 0]), dtype=torch.float32).to(self.device)
             all_cube_center += off_set
             self.all_cubes_center = all_cube_center
         else:
@@ -601,15 +570,15 @@ class cv_space(object):
             if batch_num != self.cube_center_batch_num:
                 self.cube_center_batch_num = batch_num
                 all_cube_center = self.create_grid(self.length, self.length_per_cube,
-                                                   dtype=torch.float32).repeat(batch_num, 1, 1).to(device)
-                off_set = torch.tensor(np.array([0, 0.045, 0]), dtype=torch.float32).to(device)
+                                                   dtype=torch.float32).repeat(batch_num, 1, 1).to(self.device)
+                off_set = torch.tensor(np.array([0, 0.045, 0]), dtype=torch.float32).to(self.device)
                 all_cube_center += off_set
                 self.all_cubes_center = all_cube_center
 
     # def ambient_sdf_sensors(self, rotation, trans, obj, sdfs, ifBatch=False):
     #     if ifBatch:
     #         self.get_created_cube_center(rotation.shape[0])
-    #         occupied_area = torch.zeros(self.all_cubes_center.shape[:-1]).float().to(device)  # (N, 1000)
+    #         occupied_area = torch.zeros(self.all_cubes_center.shape[:-1]).float().to(self.device)  # (N, 1000)
     #         # 所有环境一起查询
     #         R_hand = rotation.transpose(-1, -2)
     #         R_obj_inv = torch.inverse(obj.rot_mat.transpose(-1, -2))
@@ -636,7 +605,7 @@ class cv_space(object):
     #         #     # cube_center = all_cube_center[i] - obj.trans_mat[i]
     #         #     # cube_center = torch.matmul(cube_center, torch.inverse(obj.rot_mat[i].transpose(-1, -2)))
     #         #     # convert query points type
-    #         #     query_points = cube_center.to(device)
+    #         #     query_points = cube_center.to(self.device)
     #         #     # distance query
     #         #     obj_sdf = sdfs[obj.mesh_name[i]]
     #         #     query_result, outside_mask = sdf_signs_query_points(query_points, **obj_sdf)
@@ -651,7 +620,7 @@ class cv_space(object):
     # def ambient_sdf_sensors_o3d(self, rotation, trans, obj, sdfs, ifBatch=False):
     #     if ifBatch:
     #         self.get_created_cube_center(rotation.shape[0])
-    #         occupied_area = torch.zeros(self.all_cubes_center.shape[:-1]).float().to(device)  # (N, 1000)
+    #         occupied_area = torch.zeros(self.all_cubes_center.shape[:-1]).float().to(self.device)  # (N, 1000)
     #
     #         # all_cube_center = torch.matmul(all_cube_center, rotation.transpose(-1, -2)) + trans.unsqueeze(
     #         #     -2)  # (1000, 3) * (N, 3, 3) + (N, 1, 3) -> (N, 1000, 3)

@@ -2,16 +2,12 @@
 
 import os
 import numpy as np
-from numpy.random import RandomState
-
 import trimesh
 import torch
 import point_cloud_utils as pcu
-
 import open3d as o3d
-import copy
 
-from pathlib import Path
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -72,10 +68,10 @@ def load_stl_files(dir_list, sample_params=None):
 
 
 class SharedDexRepSensor:
-    def __init__(self, args):
+    def __init__(self, args, device):
         import dexrep
-        self.Sensor = dexrep.DexRep()
-        self.task_name = args["task_name"]
+        self.Sensor = dexrep.DexRep(args, device=device)
+        # self.task_name = args["task_name"]
 
         self.scaled_sampled_points = {}
         self.scaled_sampled_normals = {}
@@ -157,7 +153,9 @@ class SharedDexRepSensor:
             hand_pos,
             hand_rot,
             sampled_points,
-            sampled_normals
+            sampled_normals,
+            # mesh_names=mesh_names,
+            # sdfs=self.mesh_sdfs
         )
         if self.BatchNormPnFeat:
             pn_feat_mean = pn_feat.mean(axis=0, keepdim=True)
